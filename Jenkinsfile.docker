@@ -1,0 +1,31 @@
+pipeline {
+    agent any
+    stages {
+        stage('Checkout') {
+            steps { checkout scm }
+        }
+        stage('Build Image') {
+            steps { sh 'docker build -t laravel-app:latest .' }
+        }
+        stage('Deploy Container') {
+            steps {
+                sh '''
+                docker rm -f laravel-app || true
+                KEY=$(docker run --rm laravel-app:latest php artisan key:generate --show)
+                docker run -d -p 8081:80 \
+                  -e APP_KEY="$KEY" \
+                  -e SESSION_DRIVER=file -e CACHE_STORE=file \
+                  --name laravel-app laravel-app:latest
+                '''
+            }
+        }
+        stage('Validate') {
+            steps {
+                sh '''
+                sleep 5
+                curl -f http://localhost:8081
+                '''
+            }
+        }
+    }
+}
